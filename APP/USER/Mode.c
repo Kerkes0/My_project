@@ -864,7 +864,7 @@ void subSpdToMotor(const u32 Spd)
 }
 
 //自检函数
-void subTestMode(void) F
+void subTestMode(void) 
 {
 	static u8 gu8FastTestSn = 8; //自检显示的数字
 	gu8LockKeyTm = 120;			 //按键解锁持续时间
