@@ -1,0 +1,2293 @@
+/******************************************************************
+ * Module		:	LCD.c
+ * Version		: V1.0
+ * Compiler	: F2MC-8L/8FX Family SOFTUNE Workbench V30L33
+ * Mcu				: MB95F636K
+ * Programmer: Yuhp
+ * Date			: 2019/4
+ *******************************************************************/
+#include "User.h"
+#include "string.h"
+#include "IC74HC595.h"
+#include "LCD.h"
+#include "Mode.h"
+#include "Adc.h"
+/****命令宏定义****/
+#define TM1680ID 0xe4
+
+#define SYSDIS 0x80
+#define SYSEN 0x81
+#define LEDOFF 0x82
+#define LEDON 0x83
+#define BLINKOFF 0x88
+#define BLINK2HZ 0x89
+#define BLINK1HZ 0x8A
+#define BLINK0_5HZ 0x8B
+
+#define SLAVEMODE 0x90
+#define RCMODE0 0x98
+#define RCMODE1 0x9A
+#define EXTCLK0 0x9C
+#define EXTCLK1 0x9E
+
+#define COM8NMOS 0xA0
+#define COM16NMOS 0xA4
+#define COM8PMOS 0xA8
+#define COM16PMOS 0xAC
+
+#define PWM01 0xB0
+#define PWM02 0xB1
+#define PWM03 0xB2
+#define PWM04 0xB3
+#define PWM05 0xB4
+#define PWM06 0xB5
+#define PWM07 0xB6
+#define PWM08 0xB7
+#define PWM09 0xB8
+#define PWM10 0xB9
+#define PWM11 0xBA
+#define PWM12 0xBB
+#define PWM13 0xBC
+#define PWM14 0xBD
+#define PWM15 0xBE
+#define PWM16 0xBF
+/******命令宏定义******/
+
+/******************************************************************
+const
+******************************************************************/
+// 7~0
+///*    H  L        ____A____
+// COM1  X  A        F        B
+// COM2  F  B        |___G____|
+// COM3  G  C        E        C
+// COM4  E  D        |___D____|
+
+#define One_Seg_A 0x02
+#define One_Seg_B 0x04
+#define One_Seg_C 0x08
+#define One_Seg_D 0x10
+#define One_Seg_E 0x20
+#define One_Seg_F 0x40
+#define One_Seg_G 0x80
+#define One_SegFig 0x01
+
+#define DIG_A_0 (One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F)
+#define DIG_A_1 (One_Seg_B | One_Seg_C)
+#define DIG_A_2 (One_Seg_A | One_Seg_B | One_Seg_D | One_Seg_E | One_Seg_G)
+#define DIG_A_3 (One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_G)
+#define DIG_A_4 (One_Seg_B | One_Seg_C | One_Seg_F | One_Seg_G)
+#define DIG_A_5 (One_Seg_A | One_Seg_C | One_Seg_D | One_Seg_F | One_Seg_G)
+#define DIG_A_6 (One_Seg_A | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F | One_Seg_G)
+#define DIG_A_7 (One_Seg_A | One_Seg_B | One_Seg_C)
+#define DIG_A_8 (One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F | One_Seg_G)
+#define DIG_A_9 (One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_F | One_Seg_G)
+#define LET_A_A (One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_E | One_Seg_F | One_Seg_G)
+#define LET_A_b (One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F | One_Seg_G)
+#define LET_A_C (One_Seg_A | One_Seg_D | One_Seg_E | One_Seg_F)
+#define LET_A_d (One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_G)
+#define LET_A_E (One_Seg_A | One_Seg_D | One_Seg_E | One_Seg_F | One_Seg_G)
+#define LET_A_F (One_Seg_A | One_Seg_E | One_Seg_F | One_Seg_G)
+#define LET_A_H (One_Seg_B | One_Seg_C | One_Seg_E | One_Seg_F | One_Seg_G)
+#define LET_A_L (One_Seg_D | One_Seg_E | One_Seg_F)
+#define LET_A_n (One_Seg_C | One_Seg_E | One_Seg_G)
+#define LET_A_o (One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_G)
+#define LET_A_P (One_Seg_A | One_Seg_B | One_Seg_E | One_Seg_F | One_Seg_G)
+#define LET_A_U (One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F)
+#define LET_A__ (One_Seg_G)
+
+const uchar u8LcdDispTab1[] = {
+	DIG_A_0, DIG_A_1, DIG_A_2, DIG_A_3, DIG_A_4,
+	DIG_A_5, DIG_A_6, DIG_A_7, DIG_A_8, DIG_A_9,
+	LET_A_A, LET_A_b, LET_A_C, LET_A_d, LET_A_E,
+	LET_A_F, LET_A_H, LET_A_L, LET_A_n, LET_A_o,
+	LET_A_P, LET_A_U, LET_A__, 0x00, 0x00,
+	0x00};
+
+const uchar u8LcdWtRatioTab[] = {
+	2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
+	7, 7, 8, 8, 9, 9, 10, 10, 11, 11,
+	12, 12, 13, 13, 14, 14, 15, 15, 16, 17,
+	17, 18, 19, 19, 20};
+
+const uchar u8LcdCircle_0[] = {
+	One_Seg_F,
+	One_Seg_F | One_Seg_E,
+	One_Seg_F | One_Seg_E | One_Seg_D,
+	One_Seg_F | One_Seg_E | One_Seg_D | One_Seg_C,
+	One_Seg_F | One_Seg_E | One_Seg_D | One_Seg_C | One_Seg_B,
+	One_Seg_F | One_Seg_E | One_Seg_D | One_Seg_C | One_Seg_B | One_Seg_A,
+	One_Seg_F | One_Seg_E | One_Seg_D | One_Seg_C | One_Seg_B | One_Seg_A | One_SegFig,
+	One_Seg_F | One_Seg_E | One_Seg_D | One_Seg_C | One_Seg_B | One_Seg_A | One_SegFig | One_Seg_G};
+
+const uchar u8LcdCircle_1[] = {
+	One_SegFig,
+	One_SegFig | One_Seg_G,
+	One_SegFig | One_Seg_G | One_Seg_F,
+	One_SegFig | One_Seg_G | One_Seg_F | One_Seg_E,
+	One_SegFig | One_Seg_G | One_Seg_F | One_Seg_E | One_Seg_D,
+	One_SegFig | One_Seg_G | One_Seg_F | One_Seg_E | One_Seg_D | One_Seg_C,
+	One_SegFig | One_Seg_G | One_Seg_F | One_Seg_E | One_Seg_D | One_Seg_C | One_Seg_B,
+	One_SegFig | One_Seg_G | One_Seg_F | One_Seg_E | One_Seg_D | One_Seg_C | One_Seg_B | One_Seg_A};
+
+const uchar u8LcdCircle_2[] = {
+	One_Seg_A,
+	One_Seg_A | One_Seg_F,
+	One_Seg_A | One_Seg_F | One_Seg_E,
+	One_SegFig | One_Seg_G | One_Seg_F | One_Seg_E | One_Seg_A};
+
+const uchar u8TestTab1[] = {
+	One_Seg_A,
+	One_Seg_A | One_Seg_B,
+	One_Seg_A | One_Seg_B | One_Seg_C,
+	One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D,
+	One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E,
+	One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F,
+	One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F | One_Seg_G,
+	One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F | One_Seg_G | One_SegFig};
+
+uint WashTmSet_buf = 0;	   // yyxxll
+uchar gu8SetWastTm;		   // yyxxll
+uint data_buf = 0;		   // yyxxll
+uint gu16RunSpd_buf = 0;   // yyxxll
+uchar gu8SetContiUpTm = 2; // yyxxll
+uchar gs8SpdContiUp = 0;   // yyxxll
+
+uchar gs8ErrorDataFlagConup = 0;		// yyxxll
+uchar gs8ErrorDataFlagWash = 0;			// yyxxll
+uchar gs8ErrorDataFlagWashModeDown = 0; // yyxxll
+uchar gs8ErrorDataFlagWashAutoOTn = 0;	// yyxxll
+
+uint gu16RunSpd_mode_time_buf = 0; // yxl-5
+uchar fg_flip_lock = 0;			   // yxl-5
+uint WaterGate_set_buff = 0;
+
+uint count_water_spd_tms = 0; // yxl-5
+// uchar fg_wtrpm_hourmin=0;  ////20211222
+
+uint16_t Temp_value_sensor_lcdinit = 0; //显示压力值
+
+uint u16LadderSpd[] = {
+
+	850,  // 0//yxl-30%
+	850,  // 1
+	850,  // 2  30%
+	910,  // 3  35%
+	1040, // 4  40%
+	1170, // 5  45%
+	1300, // 6  50%
+	1430, // 7  55%
+	1560, // 8  60%
+	1690, // 9  65%
+	1820, // 10 70%
+	1950, // 11 75%
+	2080, // 12 80%
+	2210, // 13 85%
+	2340, // 14	90%
+	2470, // 15 95%//yxl  功率不稳定
+	2600  // 16 100%
+
+};
+
+/******************************************************************
+variables in project
+******************************************************************/
+uint gu16TripFlg = 0;
+uint gu16TripFlg_tw = 0; // yxl-5
+uint gu16TripFlgBef = 0;
+uint gu16TripFlgBef_buf = 0; // yxl-5
+uchar gu16TripNum = 0;
+uchar gu8DsipNum[17]; //显存
+uchar gu8SetTimeFlashCnt = 0;
+uchar gu8LcdInitOk = 0;
+uchar gu8LcdInitTm = 15; // yxl-5  显示机型码
+// uchar u8LcdDebug88 = 0xff;
+uchar gu8TripQueryTm = 0;
+// uchar gu8LcdWrCirRunSn = 0;
+// uchar gu8LcdWrCirTm = 0;
+uchar u8LcdDebug88 = 0;
+uchar fg_one_led = 0;
+
+uchar fg_gu8SetMode_laststate = 0; // yxl-bash //20211210+
+
+// uchar atext4 = 0;
+// uchar atext5 = 0;
+/******************************************************************
+function in file
+******************************************************************/
+void DelayUs(uint u16Tm);
+void I2CStart_1729(void);
+void I2CStop_1729(void);
+void I2CSendByte_1729(uchar data);
+// void InitTm1729(void);
+void FunWriteRam_1729(void);
+void FunDispBuff(void);
+void subDispRpm(uint data, uchar mode);
+
+IC74HC595tag displayIc = {
+	.clk = {GPIOB, GPIO_Pin_13},
+	.sck = {GPIOB, GPIO_Pin_14},
+	.sda = {GPIOB, GPIO_Pin_12},
+
+	.en = {GPIOB, GPIO_Pin_15} // yxl-5
+};
+
+void FunWriteRam_1729(void)
+{
+
+	//	static uchar cnt = 0;
+	static uchar gu8BakLgtDlyTmBak = 0;
+	static uchar gu8SetModeBak = 0;
+
+	if (gu8LcdInitOk EQU 0) //芯片初始化
+	{
+		gu8LcdInitOk = 2;
+		//		cnt = 0;
+		memset(gu8DsipNum, 0x00, 17); // yxl-5
+
+		///////////////////////20211028
+		// IC74HC595_Write(&displayIc,gu8DsipNum,17*8);//yxl-5
+		//按键灯根据gu8DsipNum[15]位的高点亮、低灭掉
+		IC74HC595_Write(&displayIc, (gu8DsipNum[15] << 1)); //左移一位是因为前后版本的二极管与595芯片连接刚好左移了一接口
+		SendDataToHt1621_Sub(gu8DsipNum);					// LCD液晶屏根据gu8DsipNum的数组数值进行显示
+															///////////////////////20211028
+	}
+	else if (gu8LcdInitOk EQU 2) //?正常显示
+	{
+
+		if (gu8LcdInitTm > 10)			  // 20211211
+			memset(gu8DsipNum, 0xFF, 17); // yxl-5
+		else if (gu8LcdInitTm > 0)		  // yxl-5  显示机型码
+		{
+			memset(gu8DsipNum, 0, 17); // yxl-5
+
+			if (Modcode[0] == 'A')
+			{
+				gu8DsipNum[16] = u8LcdDispTab1[10];
+			}
+			else if (Modcode[0] == 'H')
+			{
+				gu8DsipNum[16] = u8LcdDispTab1[16];
+			}
+			else
+			{
+				gu8DsipNum[16] = u8LcdDispTab1[22];
+			}
+
+			if (Modcode[1] == 'c')
+			{
+				gu8DsipNum[4] = u8LcdDispTab1[12];
+			}
+			else if (Modcode[1] == 'd')
+			{
+				gu8DsipNum[4] = u8LcdDispTab1[13];
+			}
+			else
+			{
+				gu8DsipNum[4] = u8LcdDispTab1[22];
+			}
+
+			if (Modcode[2] == '0')
+			{
+				gu8DsipNum[5] = u8LcdDispTab1[0];
+			}
+			else if (Modcode[2] == '1')
+			{
+				gu8DsipNum[5] = u8LcdDispTab1[1];
+			}
+			else
+			{
+				gu8DsipNum[5] = u8LcdDispTab1[22];
+			}
+
+			if (Modcode[3] == '7')
+			{
+				gu8DsipNum[6] = u8LcdDispTab1[7];
+			}
+			else if (Modcode[3] == '1')
+			{
+				gu8DsipNum[6] = u8LcdDispTab1[1];
+			}
+			else if (Modcode[3] == '5')
+			{
+				gu8DsipNum[6] = u8LcdDispTab1[5];
+			}
+			else if (Modcode[3] == '8')
+			{
+				gu8DsipNum[6] = u8LcdDispTab1[8];
+			}
+			else
+			{
+				gu8DsipNum[6] = u8LcdDispTab1[22];
+			}
+
+			/////////////拨码器开关显示  //20211211
+			if ((switch_key & 0x01) == 0x01)
+				gu8DsipNum[7] = u8LcdDispTab1[1];
+			else
+				gu8DsipNum[7] = u8LcdDispTab1[0];
+			if ((switch_key & 0x02) == 0x02)
+				gu8DsipNum[8] = u8LcdDispTab1[1];
+			else
+				gu8DsipNum[8] = u8LcdDispTab1[0];
+			if ((switch_key & 0x04) == 0x04)
+				gu8DsipNum[9] = u8LcdDispTab1[1];
+			else
+				gu8DsipNum[9] = u8LcdDispTab1[0];
+			if ((switch_key & 0x08) == 0x08)
+				gu8DsipNum[10] = u8LcdDispTab1[1];
+			else
+				gu8DsipNum[10] = u8LcdDispTab1[0];
+			if ((switch_key & 0x10) == 0x10)
+				gu8DsipNum[11] = u8LcdDispTab1[1];
+			else
+				gu8DsipNum[11] = u8LcdDispTab1[0];
+			if ((switch_key & 0x20) == 0x20)
+				gu8DsipNum[12] = u8LcdDispTab1[1];
+			else
+				gu8DsipNum[12] = u8LcdDispTab1[0];
+			if ((switch_key & 0x40) == 0x40)
+				gu8DsipNum[13] = u8LcdDispTab1[1];
+			else
+				gu8DsipNum[13] = u8LcdDispTab1[0];
+			if ((switch_key & 0x80) == 0x80)
+				gu8DsipNum[14] = u8LcdDispTab1[1];
+			else
+				gu8DsipNum[14] = u8LcdDispTab1[0];
+			//当前压力值
+			if (gu8LcdInitTm == 10) // yxl-e207
+			{
+				Temp_value_sensor_lcdinit = AD_fin_buf;
+			}
+			subDispWt(Temp_value_sensor_lcdinit, 1);
+
+			////////////20211211
+			if (gu8LcdInitTm == 1)
+				gu8BakLgtDlyTm = 5; //修复上电后按解锁键不会全亮的问题//20211206//20220107修复大气压校准CA01不会显示的buf
+		}
+
+		if ((fg_rest_con_ok == 1) && (gs8PowerWashOTn == 2)) // yxl-6水管校准学习
+		{
+			if ((bCompOnCmd == 1) && (gu8SpmTempGrade == 0)&& (gu8SetMode > 0) && (gu8SetMode != FASTTEST))
+			{
+				gu8DsipNum[4] &= ~One_SegFig; // yyxxll
+				gu8DsipNum[5] &= ~One_SegFig; // yyxxll
+				gu8DsipNum[7] = 0;
+				gu8DsipNum[8] = 0;
+				gu8DsipNum[9] = 0;
+				gu8DsipNum[10] = 0;
+				gu8DsipNum[11] = 0;
+				gu8DsipNum[12] = 0;
+				gu8DsipNum[13] = 0;
+				gu8DsipNum[14] = 0;
+			}
+		}
+
+		//////////防止上电一瞬间跳闪/////20211210+
+		if (gu8SetMode == 0) // yxl-bash 防止上电一瞬间跳闪
+		{
+			fg_gu8SetMode_laststate = 0;
+		}
+		else
+		{
+			if (fg_gu8SetMode_laststate == 0)
+			{
+				fg_gu8SetMode_laststate = 1;
+				if (gu8SetMode != FASTTEST)
+				{ // 20220119
+					gu8DsipNum[4] &= ~One_SegFig;
+					gu8DsipNum[5] &= ~One_SegFig;
+				}
+			}
+		}
+		//////////防止上电一瞬间跳闪/////20211210+
+
+		/////////////20211222
+		// gu8DsipNum[4]的0x01位表示流量单位是否显示，
+		if (((gu8DsipNum[4] & 0x01) == 1) && (gu8SetMode > 0) && (gu8LcdInitTm == 0) && (gu8SetMode != FASTTEST)) //单位灯
+		{
+			if (water_uint_switch == 0) // m3/h
+			{
+			}
+			else if (water_uint_switch == 1) // L/min
+			{
+				gu8DsipNum[2] |= One_SegFig;
+				gu8DsipNum[4] &= ~One_SegFig;
+			}
+			else if (water_uint_switch == 2) // IMP gpm
+			{
+				gu8DsipNum[6] |= One_SegFig;
+				gu8DsipNum[14] |= One_SegFig; // YXL-5  加灯
+				gu8DsipNum[4] &= ~One_SegFig;
+			}
+			else if (water_uint_switch == 3) // US gpm
+			{
+				gu8DsipNum[3] |= One_SegFig;
+				gu8DsipNum[15] |= One_SegFig; // yxl-5 加灯
+				gu8DsipNum[4] &= ~One_SegFig;
+			}
+		}
+		// 20220105+
+		if ((fg_flash_rest_con == 1) && (gu8SetMode != FASTTEST) && (gu8SetMode > 0)) //自学习预备时间闪烁显示
+		{
+			if (gu8SetTimeFlashCnt % 2) //闪烁显示
+			{
+				gu8DsipNum[4] &= ~One_SegFig;
+				gu8DsipNum[5] &= ~One_SegFig;
+				gu8DsipNum[2] &= ~One_SegFig;
+				gu8DsipNum[6] &= ~One_SegFig;
+				gu8DsipNum[14] &= ~One_SegFig;
+				gu8DsipNum[3] &= ~One_SegFig;
+				gu8DsipNum[15] &= ~One_SegFig;
+			}
+		}
+		// 20220105+
+
+		//上电初始化且不是自检后
+		if ((gu8LcdInitTm == 0) AND(gu8SetMode != FASTTEST)) // yxl_wifi
+		{
+			// wifi图标
+			if (fg_wifi_led == 1)
+			{
+				gu8DsipNum[0] |= 0x01;
+			}
+			else
+			{
+				gu8DsipNum[0] &= ~0x01; // yxl-5
+			}
+		}
+		/////////////20211222
+
+		if ((fg_ageing_ok == 1) && (gu16TripFlg_tw == 0) && (gu16TripFlg == 0)) //老化测试、无故障时
+		{
+			memset(gu8DsipNum, 0xFF, 17);
+		}
+
+		if ((fg_ageing_ok == 1) && ((gu16TripFlg_tw != 0) || (gu16TripFlg != 0))) //老化测试、有故障时
+		{
+			gu8SetMode = 0x02;
+		}
+
+		///////////////////////20211028
+		// IC74HC595_Write(&displayIc,gu8DsipNum,17*8);//yxl-5
+		//按键灯根据gu8DsipNum[15]位的高点亮、低灭掉
+		IC74HC595_Write(&displayIc, (gu8DsipNum[15] << 1)); //左移一位是因为前后版本的二极管与595芯片连接刚好左移了一接口
+		SendDataToHt1621_Sub(gu8DsipNum);					// LCD液晶屏根据gu8DsipNum的数组数值进行显示
+		///////////////////////20211028
+
+		//		if (++cnt > 5)
+		//		{
+		//			cnt = 0;
+		//		}
+
+		if (gu8LcdInitTm EQU 0)
+		{
+			//			atext4 = gu8BakLgtDlyTmBak;//记得删
+			//			atext5 = gu8SetModeBak;//记得删
+			if ((gu8BakLgtDlyTm EQU 0)AND(gu8BakLgtDlyTmBak > 0) AND(gu8SetMode > 0))
+				gu8LcdInitOk = 3;
+			if ((gu8BakLgtDlyTmBak EQU 0)AND(gu8BakLgtDlyTm > 0))
+				gu8LcdInitOk = 4;
+			if ((gu8SetMode EQU 0)AND(gu8SetModeBak > 0))
+				gu8LcdInitOk = 5;
+			if ((gu8SetModeBak EQU 0)AND(gu8SetMode > 0))
+				gu8LcdInitOk = 4;
+		}
+
+		if (gu8BakLgtDlyTm == 1)
+			fg_light_onts = 0; // yxl-deng
+	}
+	else
+	{
+		//自己控制亮度
+		if (gu8LcdInitOk EQU 3) //小亮度
+		{
+			if (fg_ageing_ok == 0) //无老化故障时
+				fg_light_pwm = 1;  // YXL-5//低亮度
+		}
+		else if (gu8LcdInitOk EQU 5) //中亮度
+		{
+			if (fg_ageing_ok == 0) //无老化故障时
+				fg_light_pwm = 0;  // YXL-5
+		}
+		else //全亮度
+		{
+			if (fg_ageing_ok == 0) //无老化故障时
+				fg_light_pwm = 0;  // YXL-5//全亮度
+		}
+		gu8LcdInitOk = 2;
+	}
+
+	// 20211125
+	if (fg_one_led == 1 && fg_ageing_ok == 0)
+		fg_light_pwm = 1; // YXL-5  一个灯半亮
+
+	if (fg_light_onts)
+		fg_light_pwm = 0; // YXL-deng  亮一次
+
+	gu8BakLgtDlyTmBak = gu8BakLgtDlyTm;
+	gu8SetModeBak = gu8SetMode;
+
+	//===========================yxl-5  自己控制亮度
+}
+
+void DispToItemHi(uchar *p, uint input, uchar Num)
+{
+	uchar j = Num;
+	uint data = input;
+
+	while (j--)
+	{
+		*(p + j) = data % 10;
+		data = data / 10;
+	}
+}
+
+void DispToItemLo(uchar *p, uint input, uchar Num)
+{
+	uchar j = 0;
+	uint data = input;
+
+	while (j < Num)
+	{
+		*(p + j) = data % 10;
+		data = data / 10;
+		j++;
+	}
+}
+//循环闪烁错误，每个3s
+static void subDispTrip(void)
+{
+	static uchar u8LcdTripSn = 0;
+
+	switch (u8LcdTripSn)
+	{
+	case 0: //输入电压异常E001
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Involterror))
+		{
+			gu16TripNum = 0;
+			gu8TripQueryTm = 60;
+			break;
+		}
+
+	case 1: //输出电流超过限值
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Incurroverh))
+		{
+			gu16TripNum = 1;
+			gu8TripQueryTm = 60;
+			break;
+		}
+
+	case 2: //散热器过热
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, IpmTempoverh))
+		{
+			gu16TripNum = 2;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 3: //散热器传感器故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Ipmnotemp))
+		{
+			gu16TripNum = 3;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 4: //主控驱动故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Insysdriverr))
+		{
+			gu16TripNum = 4;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 5: //电机缺相保护
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Inmotmisitem))
+		{
+			gu16TripNum = 5;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 6: //交流电流采样电路故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Incurrerror))
+		{
+			gu16TripNum = 6;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 7: // DC电压异常
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Indccurrer))
+		{
+			gu16TripNum = 7;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 8: // PFC保护
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Inpfcprot))
+		{
+			gu16TripNum = 8;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 9: //电机功率超载
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Inmotoverload))
+		{
+			gu16TripNum = 9;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 10: //电机电流检测电路故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Inmotcurrerr))
+		{
+			gu16TripNum = 10;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 11: //主控制EEPROM读写故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Insyseepeer))
+		{
+			gu16TripNum = 11;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 12: // RTC时钟读写故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg, Owrtcerror))
+		{
+			gu16TripNum = 12;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 13: //键盘EEPROM读写故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg, Oweeperror))
+		{
+			gu16TripNum = 13;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 14: //键盘与主控制通信故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Inuarterr))
+		{
+			gu16TripNum = 14;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 15: //外部485通讯故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg, Ow485error))
+		{
+			gu16TripNum = 15;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 16: //传感器故障
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg, Ownowaterpr))
+		{
+			gu16TripNum = 20;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 17: // 高温预警降速
+		u8LcdTripSn++;
+
+		if (gu8SpmTempGrade == 1) // 高温预警降速
+		{
+			gu16TripNum = 17;
+			gu8TripQueryTm = 60;
+			u8LcdTripSn = 11;
+			break;
+		}
+	case 18:// AC欠压降速
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg, Owlowvolt)) 
+		{
+			gu16TripNum = 18;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 19: //防冻保护
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg, Owfrostpro))
+		{
+			gu16TripNum = 19;
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 20://干烧保护 yxl-e208
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg_tw, Inlowflowerr)) 
+		{
+			gu16TripNum = 16; // yxl-e207
+			gu8TripQueryTm = 60;
+			break;
+		}
+	case 21://自吸失败E209
+		u8LcdTripSn++;
+		if (ValBit(gu16TripFlg, Owupwaterfail)) 
+		{
+			gu16TripNum = 21; // yxl-e207
+			gu8TripQueryTm = 60;
+			break;
+		}
+	default:
+		u8LcdTripSn = 0;
+		//	gu8TripQueryTm = 60;//yxl-5  防止最后一个闪烁6秒
+		break;
+	}
+}
+
+//故障显示
+static void subDispTripFlash(void)
+{
+	uchar j;
+	uint data = 0;
+
+	gs8ErrorDataFlagConup = 1; // yyxxll
+	gs8ErrorDataFlagWash = 1;  // yyxxll
+
+	gs8ErrorDataFlagWashModeDown = 1; //自行减速到80%
+	gs8ErrorDataFlagWashAutoOTn = 1;  //自动反冲洗取消
+	
+	// gu16TripNum的17、18、19是特殊，需单独设置
+	if (gu16TripNum EQU 17) //高温降速
+	{
+		//循环显示 故障和实际值，3s一次轮转
+		if (fg_3s_lowsp)
+		{
+			gu8DsipNum[6] = u8LcdDispTab1[1];
+			gu8DsipNum[5] = u8LcdDispTab1[0];
+			gu8DsipNum[4] = u8LcdDispTab1[17];
+			gu8DsipNum[16] = u8LcdDispTab1[10]; //千位  yxl-5
+		}
+		else
+		{
+			if ((gu8SetMode == CONTROL) || ((fg_time_spd_contorl == 1) && (gu8SetMode == TIME)))
+			{
+				data = WaterGate / 100;
+				subDispRpm(data, 1);
+
+				if (gu8Wash)
+					gu8DsipNum[4] &= ~One_SegFig;
+				else
+					gu8DsipNum[4] |= One_SegFig;
+				gu8DsipNum[5] &= ~One_SegFig;
+			}
+			else
+			{
+				for (j = 0; j < 17; j++) // YXL-5
+				{
+					if (gu16RunSpd >= u16LadderSpd[j])
+						data = u16LadderSpd[j];
+				}
+
+				subDispRpm(data, 1);
+
+				if (gu8Wash)
+					gu8DsipNum[5] &= ~One_SegFig; // yyxxll  YXL-5
+				else
+					gu8DsipNum[5] |= One_SegFig; //图标RPM显示
+			}
+		}
+	}
+
+	else if (gu16TripNum EQU 18) //AC欠压降速
+	{
+
+		if (fg_3s_lowsp)
+		{
+			gu8DsipNum[6] = u8LcdDispTab1[2];
+			gu8DsipNum[5] = u8LcdDispTab1[0];
+			gu8DsipNum[4] = u8LcdDispTab1[17];
+			gu8DsipNum[16] = u8LcdDispTab1[10]; //千位  yxl-5
+		}
+
+		else
+		{
+			//=====================================yxl-5  循环显示 故障和实际值
+
+			if ((gu8SetMode == CONTROL) || ((fg_time_spd_contorl == 1) && (gu8SetMode == TIME)))
+			{
+
+				data = WaterGate / 100;
+				subDispRpm(data, 1);
+
+				if (gu8Wash)
+					gu8DsipNum[4] &= ~One_SegFig;
+				else
+					gu8DsipNum[4] |= One_SegFig;
+				gu8DsipNum[5] &= ~One_SegFig;
+			}
+			else
+			{
+				for (j = 0; j < 17; j++) // YXL-5
+				{
+					if (gu16RunSpd >= u16LadderSpd[j])
+						data = u16LadderSpd[j];
+				}
+
+				subDispRpm(data, 1);
+
+				if (gu8Wash)
+					gu8DsipNum[5] &= ~One_SegFig; // yyxxll  YXL-5
+				else
+					gu8DsipNum[5] |= One_SegFig; //图标RPM显示//yyxxll  YXL-5
+			}
+		}
+	}
+
+	else if (gu16TripNum EQU 19)//防冻保护
+	{
+		gu8DsipNum[6] = u8LcdDispTab1[3];
+		gu8DsipNum[5] = u8LcdDispTab1[0];
+		gu8DsipNum[4] = u8LcdDispTab1[17];
+		gu8DsipNum[16] = u8LcdDispTab1[10]; //千位  yxl-5
+	}
+	else if (gu16TripNum EQU 20) //传感器故障E208
+	{
+
+		gu8DsipNum[6] = u8LcdDispTab1[8];
+		gu8DsipNum[5] = u8LcdDispTab1[0];
+		gu8DsipNum[4] = u8LcdDispTab1[2];
+		gu8DsipNum[16] = u8LcdDispTab1[14]; //千位  yxl-5
+	}
+	else if (gu16TripNum EQU 21) //自吸失败E209
+	{
+
+		gu8DsipNum[6] = u8LcdDispTab1[9];
+		gu8DsipNum[5] = u8LcdDispTab1[0];
+		gu8DsipNum[4] = u8LcdDispTab1[2];
+		gu8DsipNum[16] = u8LcdDispTab1[14]; //千位  yxl-5
+	}
+	else if (gu16TripNum < 17) // OR(gu16TripNum EQU 11))//yxl-5
+	{
+		if (gu16TripNum < 2)
+			data = gu16TripNum + 1;
+		else if (gu16TripNum < 10)	 // yxl-5
+			data = gu16TripNum + 99; // yxl-5
+		else if (gu16TripNum < 17)
+			data = gu16TripNum + 191; // yxl-5
+		else
+			data = gu16TripNum + 191; // yxl-5
+
+		subDispRpm(data, 0);
+		gu8DsipNum[16] = u8LcdDispTab1[14]; // yxl-5
+	}
+}
+
+//功率圈,?无用
+void subDispWrCir(void) // yxl-5
+{
+}
+
+//功率的四位数码管
+void subDispWt(uint data, uchar mode) // mode为1时，如数据是103，则显示屏显示103而不会显示0103
+{
+	uchar i;
+	uchar dataTab[4] = {0, 0, 0, 0};
+
+	if (data > 9999)
+		data = 9999;
+	DispToItemLo(&dataTab[0], data, 4);
+	for (i = 0; i < 4; i++)
+	{
+		if (dataTab[i] > 25)
+			dataTab[i] = 25;
+	}
+
+	gu8DsipNum[3] = u8LcdDispTab1[dataTab[0]];
+	gu8DsipNum[2] = u8LcdDispTab1[dataTab[1]];
+	gu8DsipNum[1] = u8LcdDispTab1[dataTab[2]];
+	gu8DsipNum[0] = u8LcdDispTab1[dataTab[3]];
+
+	if (mode)
+	{
+		if (data < 1000)
+			gu8DsipNum[0] = 0x00;
+		if (data < 100)
+			gu8DsipNum[1] = 0x00;
+		if (data < 10)
+			gu8DsipNum[2] = 0x00;
+	}
+}
+
+//转速四位数码管
+void subDispRpm(uint data, uchar mode) // mode为1时，如数据是103，则显示屏显示103而不会显示0103
+{
+	uchar i, j, k, s; // yyxxll
+	uchar dataTab[4] = {0, 0, 0, 0};
+
+	if (data > 9999)
+		data = 9999;
+
+	if (gu8SetMode == TIME) // yxl-5  流量控制的转速不在可显示范围内
+	{
+		if (fg_time_control == 0)
+		{
+			for (k = 1; k < 17; k++) // yxl-5
+			{
+				if ((gu16RunSpd >= u16LadderSpd[k - 1]) && (gu16RunSpd < u16LadderSpd[k]))
+				{
+					gu16RunSpd = u16LadderSpd[k - 1];
+				}
+			}
+		}
+	}
+	//不是TIME模式时，退出TIME-流量模式（？为什么在这定义）
+	if (gu8SetMode != TIME)
+		fg_time_control = 0;
+
+	//将转速的数值转换为%单位的数值
+	for (j = 0; j < 17; j++) // yxl-5
+	{
+		if (data == u16LadderSpd[j])
+		{
+			data = 20 + 5 * j;
+			if (data < 30)
+				data = 30; // yxl-30%
+		}
+	}
+
+	if (gu8SetMode != MODE)
+		fg_screen_real_watervalue = 0;
+
+	if (fg_screen_real_watervalue == 1)
+	{
+		data = WaterGate / 100;
+		s = WaterGate % 100;
+		if (s > 50)
+			data += 1;
+	}
+
+	if (gu8SetMode == CONTROL) // yxl-55 防止定时转流量再转速率出现渐增
+	{
+		gu16RunSpd_buf = gu16RunSpd;
+	}
+
+	if ((gu16RunSpd_buf == 0) AND(gu16RunSpd != 0) AND(gu8PowerOnTm > 9)
+			AND(gu8SetMode != CONTROL) AND(fg_time_control == 0) AND(gu8SetMode != FASTTEST)) //渐增效果  YXL-5
+	{
+		if (data_buf < data)
+		{
+			if (gu8SetContiUpTm == 0)
+			{
+				gs8SpdContiUp = 1; //标志位
+				gu8SetContiUpTm = 2;
+				data_buf += 5;
+			}
+
+			if (gs8ErrorDataFlagConup == 1) ////故障代码
+			{
+				gs8ErrorDataFlagConup = 0;
+			}
+			else
+			{
+				data = data_buf;
+			}
+		}
+		else
+			gu16RunSpd_buf = gu16RunSpd;
+	}
+	else
+	{
+		gs8SpdContiUp = 0;
+	}
+
+	if (gu8Wash) //冲洗
+	{
+		if ((WashTmSet_buf != WashTmSet) OR(gs8ShineOneTime))
+		{
+			gs8ShineOneTime = 0;
+			WashTmSet_buf = WashTmSet;
+			gu8SetWastTm = 6; // yxl-5//反冲洗设置时间的闪烁时间
+		}
+
+		if (gu8SetWastTm > 0)
+		{
+			if (gu8SetTimeFlashCnt % 2)
+			{
+				if (WashTmSet != 0)
+					data = WashTmSet; // yyxxll
+				else
+					data = 1; // yxl-5
+			}
+			else
+			{
+				data = 0;
+			}
+			if (gu8SetWastTm == 1)
+				WashTm = WashTmSet;
+		}
+		else
+		{
+			data = WashTm;
+			if (data == 0)
+				gu8Wash = 0;
+		}
+	}
+
+	//单纯是自学习时，没有超频自吸、没有上水
+	if ((fg_rest_con_ok == 1 ) && (gs8PowerWashOTn == 2) && (fg_auto_upwater == 0) && (fg_selfimbi_ok == 0)) // yxl-6水管校准学习
+	{
+		if ((bCompOnCmd == 1) && (gu8SpmTempGrade == 0)&& (gu8SetMode > 0) && (gu8SetMode != FASTTEST))
+		{
+			data = count_tm_120s_con;
+			WashTm = count_tm_120s_con;
+			
+		}
+	}
+	///==================================================//yyxxll
+
+	//将传入data转换为单个数字存储进ataTab[]数组中
+	DispToItemLo(&dataTab[0], data, 4);
+	for (i = 0; i < 4; i++)
+	{
+		if (dataTab[i] > 25)
+			dataTab[i] = 25;
+	}
+
+	gu8DsipNum[6] = u8LcdDispTab1[dataTab[0]];
+	gu8DsipNum[5] = u8LcdDispTab1[dataTab[1]];
+	gu8DsipNum[4] = u8LcdDispTab1[dataTab[2]];
+	gu8DsipNum[16] = u8LcdDispTab1[dataTab[3]]; // yxl-5
+
+	if (mode)
+	{
+		if (data < 1000)
+			gu8DsipNum[16] = 0x00; // yxl-5
+		if (data < 100)
+			gu8DsipNum[4] = 0x00;
+		if (data < 10)
+			gu8DsipNum[5] = 0x00;
+		if ((gu8Wash)AND(data == 0))
+			gu8DsipNum[6] = 0x00; // yyxxll
+		if ((gu8Wash)AND(data == 1) AND(gu8SetWastTm > 0))
+			gu8DsipNum[6] = u8LcdDispTab1[0];
+		; // yyxxll4 解决0无法显示
+	}
+
+	//气压校准显示：CAL1
+	if ((count_dis_air_tm) && (gu8SetMode == 0)) // 气压校准  yxl-5
+	{
+		// cail
+		gu8DsipNum[6] = u8LcdDispTab1[1];
+		gu8DsipNum[5] = u8LcdDispTab1[17];
+		gu8DsipNum[4] = u8LcdDispTab1[10];
+		gu8DsipNum[16] = u8LcdDispTab1[12];
+	}
+	//无水保护标志：A--0/1
+	if ((count_waterpro_tm) && (gu8SetMode == 0)) // 无水保护开闭  yxl-5
+	{
+		// cail
+		gu8DsipNum[6] = u8LcdDispTab1[fg_waterpro_ok];
+		gu8DsipNum[5] = u8LcdDispTab1[22];
+		gu8DsipNum[4] = u8LcdDispTab1[22];
+		gu8DsipNum[16] = u8LcdDispTab1[10];
+	}
+	// AD校准值：
+	if ((count_dis_ad_cal_tm) && (gu8SetMode == 0)) // AD校准值显示
+	{
+		if (temp_cail_add > 0)
+		{
+			gu8DsipNum[4] |= One_SegFig; //
+		}
+		else if (temp_cail_subtra > 0)
+		{
+			gu8DsipNum[5] |= One_SegFig; //
+		}
+		else
+		{
+			gu8DsipNum[4] &= ~One_SegFig; //
+			gu8DsipNum[5] &= ~One_SegFig; //
+		}
+	}
+}
+
+//时钟时间小时的二位数码管
+void subDispNowHour(uint data, uchar mode)
+{
+	uchar i;
+	uchar dataTab[2] = {0, 0};
+
+	if ((data > 24) AND(mode))
+		data = 24;
+	DispToItemLo(&dataTab[0], data, 2);
+	for (i = 0; i < 2; i++)
+	{
+		if (dataTab[i] > 25)
+			dataTab[i] = 25;
+	}
+	gu8DsipNum[8] = u8LcdDispTab1[dataTab[0]];
+	gu8DsipNum[7] = u8LcdDispTab1[dataTab[1]];
+}
+
+//时钟时间分钟的二位数码管
+void subDispNowMin(uint data, uchar mode)
+{
+	uchar i;
+	uchar dataTab[2] = {0, 0};
+
+	if ((data > 60) AND(mode))
+		data = 60;
+	DispToItemLo(&dataTab[0], data, 2);
+	for (i = 0; i < 2; i++)
+	{
+		if (dataTab[i] > 25)
+			dataTab[i] = 25;
+	}
+	gu8DsipNum[10] = u8LcdDispTab1[dataTab[0]];
+	gu8DsipNum[9] = u8LcdDispTab1[dataTab[1]];
+}
+
+//开始时间小时显示
+void subDispStartHour(uint data, uchar mode)
+{
+	uchar i;
+	uchar dataTab[2] = {0, 0};
+
+	if ((data > 24) AND(mode))
+		data = 24;
+	DispToItemLo(&dataTab[0], data, 2);
+	for (i = 0; i < 2; i++)
+	{
+		if (dataTab[i] > 25)
+			dataTab[i] = 25;
+	}
+	gu8DsipNum[8] = u8LcdDispTab1[dataTab[0]];
+	gu8DsipNum[7] = u8LcdDispTab1[dataTab[1]];
+}
+
+//开始时间分钟显示
+void subDispStartMin(uint data, uchar mode)
+{
+	uchar i;
+	uchar dataTab[2] = {0, 0};
+
+	if ((data > 60) AND(mode))
+		data = 60;
+	DispToItemLo(&dataTab[0], data, 2);
+	for (i = 0; i < 2; i++)
+	{
+		if (dataTab[i] > 25)
+			dataTab[i] = 25;
+	}
+	gu8DsipNum[10] = u8LcdDispTab1[dataTab[0]];
+	gu8DsipNum[9] = u8LcdDispTab1[dataTab[1]];
+}
+
+//结束时间小时显示
+void subDispEndHour(uint data, uchar mode)
+{
+	uchar i;
+	uchar dataTab[2] = {0, 0};
+
+	if ((data > 24) AND(mode))
+		data = 24;
+	DispToItemLo(&dataTab[0], data, 2);
+	for (i = 0; i < 2; i++)
+	{
+		if (dataTab[i] > 25)
+			dataTab[i] = 25;
+	}
+	gu8DsipNum[12] = u8LcdDispTab1[dataTab[0]];
+	gu8DsipNum[11] = u8LcdDispTab1[dataTab[1]];
+}
+
+//结束时间分钟显示
+void subDispEndMin(uint data, uchar mode)
+{
+	uchar i;
+	uchar dataTab[2] = {0, 0};
+
+	if ((data > 60) AND(mode))
+		data = 60;
+	DispToItemLo(&dataTab[0], data, 2);
+	for (i = 0; i < 2; i++)
+	{
+		if (dataTab[i] > 25)
+			dataTab[i] = 25;
+	}
+	gu8DsipNum[14] = u8LcdDispTab1[dataTab[0]];
+	gu8DsipNum[13] = u8LcdDispTab1[dataTab[1]];
+}
+
+// FASTTEST自检模式模式显示
+void subDispTest(void)
+{
+	uint data;
+
+	memset(gu8DsipNum, 0, 17);
+
+	////进入FASTTEST自检模式后，若有故障，则闪烁显示故障
+	// 3秒一个故障代码，闪烁显示3次
+	if ((gu16TripFlg)OR(gu16TripFlg_tw)) // yxl-5
+	{
+		if (gu8TripQueryTm EQU 0)
+			subDispTrip();
+		else if ((gu8TripQueryTm % 20) > 10)
+			subDispTripFlash();
+	}
+	//进入FASTTEST自检模式后的500ms*22 = 11s内的动作，一般是500ms一次动作
+	else if (gu8TestModeTm < 22)
+	{
+		//在2.5s内，lcd液晶屏闪烁3次，全部数字图标的闪烁显示为数字8
+		if (gu8TestModeTm < 5) // yxl-5
+		{
+			if ((gu8TestModeTm % 2) EQU 0)
+			{
+				memset(gu8DsipNum, 0xFF, 17);
+			}
+		}
+		//从3秒开始，每0.5s从第一个数字图标往后依次显示数字8
+		else if (gu8TestModeTm == 6) // yxl-5
+		{
+			gu8DsipNum[0] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 7) // yxl-5
+		{
+			gu8DsipNum[1] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 8) // yxl-5
+		{
+			gu8DsipNum[2] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 9) // yxl-5
+		{
+			gu8DsipNum[3] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 10) // yxl-5
+		{
+			gu8DsipNum[16] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 11) // yxl-5
+		{
+			gu8DsipNum[4] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 12) // yxl-5
+		{
+			gu8DsipNum[5] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 13) // yxl-5
+		{
+			gu8DsipNum[6] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 14) // yxl-5
+		{
+			gu8DsipNum[7] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 15) // yxl-5
+		{
+			gu8DsipNum[8] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 16) // yxl-5
+		{
+			gu8DsipNum[9] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 17) // yxl-5
+		{
+			gu8DsipNum[10] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 18) // yxl-5
+		{
+			gu8DsipNum[11] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 19) // yxl-5
+		{
+			gu8DsipNum[12] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 20) // yxl-5
+		{
+			gu8DsipNum[13] = u8LcdDispTab1[8];
+		}
+		else if (gu8TestModeTm == 21) // yxl-5
+		{
+			gu8DsipNum[14] = u8LcdDispTab1[8];
+
+			////20211222 //////开启wifi测试
+
+			mcu_start_wifitest(); // yxl-wifi 开启wifi测试
+			WifiTestOk = 0;
+			////20211222
+		}
+	}
+	else
+	{
+
+		//显示屏的功率数字部分、转速数字部分、下面的时钟数字部分显示为0
+		data = gu8FastTestSn;
+		data = data * 100 + gu8FastTestSn;
+		subDispWt(data, 0);
+		subDispRpm(data, 0);
+		//		fg_wtrpm_hourmin=1;//20211222
+		subDispStartHour(gu8FastTestSn, 0); //开始时间小时的数字
+		subDispStartMin(gu8FastTestSn, 0);	//开始时间分钟的数字
+		subDispEndHour(gu8FastTestSn, 0);	//结束时间小时的数字
+		subDispEndMin(gu8FastTestSn, 0);	//结束时间分钟	的数字
+
+		//
+		//		////////////////////////////////////////
+
+		if (KeyLed1 > 0)
+		{
+			gu8DsipNum[15] |= One_Seg_F;
+		}
+		else
+		{
+			gu8DsipNum[15] &= ~One_Seg_F;
+		}
+		if (KeyLed2 > 0)
+		{
+			gu8DsipNum[15] |= One_Seg_E;
+		}
+		else
+		{
+			gu8DsipNum[15] &= ~One_Seg_E;
+		}
+		if (KeyLed3 > 0)
+		{
+			gu8DsipNum[15] |= One_Seg_D;
+		}
+		else
+		{
+			gu8DsipNum[15] &= ~One_Seg_D;
+		}
+		if (KeyLed4 > 0)
+		{
+			gu8DsipNum[15] |= One_Seg_C;
+		}
+		else
+		{
+			gu8DsipNum[15] &= ~One_Seg_C;
+		}
+		if (KeyLed5 > 0)
+		{
+			gu8DsipNum[15] |= One_Seg_B;
+		}
+		else
+		{
+			gu8DsipNum[15] &= ~One_Seg_B;
+		}
+		if (KeyLed6 > 0)
+		{
+			gu8DsipNum[15] |= One_Seg_A;
+		}
+		else
+		{
+			gu8DsipNum[15] &= ~One_Seg_A;
+		}
+
+		//拨码器为10101010时
+		if (switch_key == 0x55)
+		{
+			gu8DsipNum[1] |= One_SegFig; //图标W显示
+			gu8DsipNum[0] |= One_SegFig; // yxl-5
+			gu8DsipNum[6] |= One_SegFig;
+			gu8DsipNum[14] |= One_SegFig; // YXL-5  加灯
+			gu8DsipNum[2] |= One_SegFig;
+			gu8DsipNum[5] |= One_SegFig; // yxl-5
+			gu8DsipNum[3] |= One_SegFig;
+			gu8DsipNum[15] |= One_SegFig; // yxl-5 加灯
+			gu8DsipNum[4] |= One_SegFig;
+			gu8DsipNum[7] |= One_SegFig; // yxl-5
+			gu8DsipNum[10] |= One_SegFig;
+			gu8DsipNum[13] |= One_SegFig;
+		}
+		else
+		{
+			gu8DsipNum[1] &= ~One_SegFig; //图标W显示
+			gu8DsipNum[0] &= ~One_SegFig; // yxl-5
+			gu8DsipNum[6] &= ~One_SegFig;
+			gu8DsipNum[14] &= ~One_SegFig; // YXL-5  加灯
+			gu8DsipNum[2] &= ~One_SegFig;
+			gu8DsipNum[5] &= ~One_SegFig;
+			gu8DsipNum[3] &= ~One_SegFig;
+			gu8DsipNum[15] &= ~One_SegFig; // yxl-5  加灯
+			gu8DsipNum[4] &= ~One_SegFig;
+			gu8DsipNum[7] &= ~One_SegFig;
+			gu8DsipNum[10] &= ~One_SegFig;
+			gu8DsipNum[13] &= ~One_SegFig;
+		}
+
+		/////////////20211222
+		////////自检时，若wifi测试成功为1，则wifi图标亮
+		if (WifiTestOk == 1)
+		{
+			gu8DsipNum[0] |= One_SegFig; // yxl-5
+		}
+		else
+		{
+			gu8DsipNum[0] &= ~One_SegFig; // yxl-5
+		}
+		/////////////20211222
+
+		//模拟输入和传感器输入测试
+		//模拟输入测试
+		if ((Temp_Value_curr_zf10_test > 560) && (Temp_Value_curr_zf10_test < 960))
+		{
+			gu8DsipNum[8] |= One_SegFig;
+			gu8DsipNum[9] &= ~One_SegFig;
+		}
+		else if ((Temp_Value_curr_zf10_test > 3124) && (Temp_Value_curr_zf10_test < 3524))
+		{
+			gu8DsipNum[9] |= One_SegFig;
+			gu8DsipNum[8] &= ~One_SegFig;
+		}
+		//传感器输入测试
+ 		if ((Temp_value_test > 545) && (Temp_value_test < 945))
+		{
+			gu8DsipNum[11] |= One_SegFig;
+			gu8DsipNum[12] &= ~One_SegFig;
+		}
+		else if ((Temp_value_test > 3238) && (Temp_value_test < 3638))
+		{
+			gu8DsipNum[12] |= One_SegFig;
+			gu8DsipNum[11] &= ~One_SegFig;
+		}
+	}
+}
+//不是自检模式时，液晶屏的显示
+void subDispBuff(void)
+{
+	uchar j, k; // yyxxll
+	uint data;
+
+	memset(gu8DsipNum, 0, 17); // yxl-5
+	//锁屏且关机时 或 恢复初始设置
+	if (((gu8BakLgtDlyTm EQU 0)AND(gu8SetMode EQU 0))OR(gu8LcdInitOk < 2))
+		return;
+
+	//功率：四个七段数码管+图标W ----- 数码管0、1、2、3 + 二极管S1
+	//参数设置
+	if (gu8SetRomTm)
+	{
+		subDispWt(gu8SetRomSn + 1, 1);
+	}
+	//有转速且可运行时
+	else if ((gu16RunSpd > 0) AND(bCompOnCmd) AND (gu8SetMode > 0))//20220517+修复关机时有转速会显示功率
+	{
+		if (gu16MotorWt < 5) // yxl-5
+		{
+			gu16MotorWt = 0; // yxl-5
+
+			subDispWt(gu16MotorWt, 1);
+		}
+		else
+		{
+			subDispWt(gu16MotorWt, 1);
+		}
+		gu8DsipNum[1] |= One_SegFig; //图标W显示
+
+		//转动时，显示实际压力值
+		if (count_dis_WaterPress_value_tm)
+		{
+			subDispWt(WaterPress_value, 1);
+			gu8DsipNum[1] &= ~One_SegFig;
+		}
+	}
+	else if ((bCompOnCmd == 0) && (gu16TripFlg == 0x40) && (gu16TripFlg_tw == 0) && (gu16RunSpd > 0)) // AC电压低降速)//在降压的时候也要显示图标W
+	{
+		if (gu16MotorWt < 5) // yxl-5
+		{
+			gu16MotorWt = 0; // yxl-5
+
+			subDispWt(gu16MotorWt, 1);
+		}
+		else
+		{
+			subDispWt(gu16MotorWt, 1);
+		}
+		gu8DsipNum[1] |= One_SegFig; //图标W显示
+	}
+	else if((gu8SetMode == TIME) && (gu8Wash) && (fg_rest_con_ok == 1))
+	{
+				if (gu16MotorWt < 5) // yxl-5
+		{
+			gu16MotorWt = 0; // yxl-5
+
+			subDispWt(gu16MotorWt, 1);
+		}
+		else
+		{
+			subDispWt(gu16MotorWt, 1);
+		}
+		gu8DsipNum[1] |= One_SegFig; //图标W显示
+	}
+	
+
+	//转速:四个七段数码管+图标RPM ----- 数码管4、5、6、7 + 二极管S2
+	//关机时
+	if (gu8SetMode EQU 0)
+	{
+		if (gu8SoftWareVerTm) //软件版本的显示
+		{
+			data = gstCodeTime.Day * 100;
+			data += (gstCodeTime.Ver & 0x00ff);
+			subDispRpm(data, 0);
+		}
+		else if (count_dis_air_tm) // 气压校准标志的显示  yxl-5
+		{
+			// data=1001;
+			subDispRpm(data, 0);
+		}
+		else if (count_waterpro_tm) // 取消无水保护标志的显示 yxl-5
+		{
+			subDispRpm(data, 0);
+		}
+		else if (count_dis_ad_cal_tm) // 校准值显示
+		{
+			if (temp_cail_add > 0)
+			{
+				data = temp_cail_add;
+			}
+			else if (temp_cail_subtra > 0)
+			{
+				data = temp_cail_subtra;
+			}
+			else 
+			{
+				data = 0;
+			}
+			subDispRpm(data, 1);
+		}
+		else if (gu8SetRomTm) //参数设置的显示
+		{
+			if (gu8SetTimeFlashCnt % 2)
+			{
+				if (gu8SetRomSn EQU 0) // yxl-5
+				{
+					for (k = 0; k < 17; k++)
+					{
+						if (gu8OutCtrlSpd1 == k + 12)
+							subDispRpm(u16LadderSpd[k], 1);
+					}
+				}
+				if (gu8SetRomSn EQU 1) // yxl-5
+				{
+					for (k = 0; k < 17; k++)
+					{
+						if (gu8OutCtrlSpd2 == k + 12)
+							subDispRpm(u16LadderSpd[k], 1);
+					}
+				}
+				if (gu8SetRomSn EQU 2) // yxl-5
+				{
+					for (k = 0; k < 17; k++)
+					{
+						if (gu8OutCtrlSpd3 == k + 12)
+							subDispRpm(u16LadderSpd[k], 1);
+					}
+				}
+				if (gu8SetRomSn EQU 3) // yxl-5
+				{
+					if (gu8wash_spd == 0)
+						subDispRpm(u16LadderSpd[12], 1);
+					else if (gu8wash_spd == 1)
+						subDispRpm(u16LadderSpd[13], 1);
+					else if (gu8wash_spd == 2)
+						subDispRpm(u16LadderSpd[14], 1);
+					else if (gu8wash_spd == 3)
+						subDispRpm(u16LadderSpd[15], 1);
+					else if (gu8wash_spd == 4)
+						subDispRpm(u16LadderSpd[16], 1);
+					else
+					{
+						gu8wash_spd = 4;
+						subDispRpm(u16LadderSpd[16], 1);
+					}
+				}
+				if (gu8SetRomSn EQU 4) // yxl-5
+				{
+					if (fg_out_voltcurr == 1)
+						subDispRpm(1, 1);
+					if (fg_out_voltcurr == 0)
+						subDispRpm(0, 1);
+				}
+				if (gu8SetRomSn EQU 5) // yxl-e207
+				{
+					subDispRpm(wash_poweron_tm, 1);
+				}
+
+				if (gu8SetRomSn EQU 6) // yxl-e207
+				{
+					if (fg_auto_manual_lowwater == 1)
+						subDispRpm(1, 1);
+					if (fg_auto_manual_lowwater == 0)
+						subDispRpm(0, 1);
+				}
+
+				if (gu8SetRomSn EQU 7) // yxl-e207
+				{
+					subDispRpm(auto_manual_lowwater_tm, 1);
+				}
+				// 0、1、2、3显示%单位，4、5、6、7不显示
+				if (gu8SetRomSn <= 3)
+				{
+					gu8DsipNum[5] |= One_SegFig; //单位%显示
+				}
+				else
+				{
+					gu8DsipNum[5] &= ~One_SegFig; //不显示&单位
+				}
+			}
+		}
+	}
+
+	else if ((gu16TripFlg)OR(gu16TripFlg_tw)) //有错误时//yxl-5
+	{
+
+		if (gu8TripQueryTm EQU 0)
+			subDispTrip();
+		else if ((gu8TripQueryTm % 20) > 10)
+			subDispTripFlash();
+	}
+	else
+	{
+		if ((gu8SetMode EQU TIME) && (gu8Wash == 0) AND(gu8SetTimeTm) AND(gu8SetTimeState > 2)) //定时设置转速
+		{
+			if (gu8SetTimeTmSn EQU 4)
+			{
+				if (gu8SetTimeFlashCnt % 2) //闪烁显示
+				{
+					if (fg_time_spd_contorl == 0) // yxl-5转速控制
+					{
+						for (k = 0; k < 17; k++) // yxl-5
+						{
+							if (gs8SetTmSpd[gu8SetTimeTmNum] == k)
+								data = u16LadderSpd[k];
+						}
+
+						///==================================================//yyxxll
+
+						subDispRpm(data, 1);
+						if (gu8Wash)
+							gu8DsipNum[5] &= ~One_SegFig; // yyxxll  YXL-5
+						else
+							gu8DsipNum[5] |= One_SegFig; //图标RPM显示//yyxxll  YXL-5
+					}
+					else // yxl-5  流量控制
+					{
+						data = gs8SetTmSpd_water[gu8SetTimeTmNum];
+						/// 20211222
+						if (water_uint_switch == 0) // m3/h
+						{
+							data = gs8SetTmSpd_water[gu8SetTimeTmNum];
+						}
+						else if (water_uint_switch == 1) // L/min
+						{
+							data = gs8SetTmSpd_water_lmin_lcd[gu8SetTimeTmNum];
+						}
+
+						else if (water_uint_switch == 2) // IMP gpm
+						{
+							data = gs8SetTmSpd_water_imp_lcd[gu8SetTimeTmNum];
+						}
+						else if (water_uint_switch == 3) // IMP gpm
+						{
+							data = gs8SetTmSpd_water_us_lcd[gu8SetTimeTmNum];
+						}
+						//////2021122
+						subDispRpm(data, 1);
+
+						if (gu8Wash)
+							gu8DsipNum[4] &= ~One_SegFig;
+						else
+							gu8DsipNum[4] |= One_SegFig;
+						gu8DsipNum[5] &= ~One_SegFig; //%图标灭
+					}
+				}
+			}
+			else
+			{
+				if (fg_time_spd_contorl == 0) // yxl-5转速控制
+				{
+					for (k = 0; k < 17; k++) // yxl-5
+					{
+						if (gs8SetTmSpd[gu8SetTimeTmNum] == k)
+							data = u16LadderSpd[k];
+					}
+
+					///==================================================//yyxxll
+
+					subDispRpm(data, 1);
+					if (gu8Wash)
+						gu8DsipNum[5] &= ~One_SegFig; // yyxxll  YXL-5
+					else
+						gu8DsipNum[5] |= One_SegFig; //图标RPM显示//yyxxll  YXL-5
+				}
+				else // yxl-5  流量控制
+				{
+					data = gs8SetTmSpd_water[gu8SetTimeTmNum];
+
+					// 20211222
+					if (water_uint_switch == 0) // m3/h
+					{
+						data = gs8SetTmSpd_water[gu8SetTimeTmNum];
+					}
+					else if (water_uint_switch == 1) // L/min
+					{
+						data = gs8SetTmSpd_water_lmin_lcd[gu8SetTimeTmNum];
+					}
+					else if (water_uint_switch == 2) // IMP gpm
+					{
+						data = gs8SetTmSpd_water_imp_lcd[gu8SetTimeTmNum];
+					}
+					else if (water_uint_switch == 3) // US gpm
+					{
+						data = gs8SetTmSpd_water_us_lcd[gu8SetTimeTmNum];
+					}
+					// 20211222
+
+					subDispRpm(data, 1);
+
+					if (gu8Wash)
+						gu8DsipNum[4] &= ~One_SegFig;
+					else
+						gu8DsipNum[4] |= One_SegFig;
+					gu8DsipNum[5] &= ~One_SegFig;
+				}
+			}
+			//			i = 12 + gu8SetTmGrd[gu8SetTimeTmNum];//转速档位显示
+			//			gu8DsipNum[i] |= One_SegFig;
+		}
+		else if ((gu8SetMode EQU TIME) && (gu8Wash == 0) AND(gu8SetTimeQueryTm > 0)) //查询
+		{
+
+			if (fg_time_spd_contorl == 0) // yxl-5转速控制
+			{
+				for (k = 0; k < 17; k++) // yxl-5
+				{
+					if (gs8RunTmSpd[gu8SetTimeQuerySn] == k)
+						data = u16LadderSpd[k];
+				}
+
+				///==================================================//yyxxll
+
+				subDispRpm(data, 1);
+				//			i = 12 + gu8RunTmGrd[gu8SetTimeQuerySn];//转速档位显示
+				//			gu8DsipNum[i] |= One_SegFig;
+				if (gu8Wash)
+					gu8DsipNum[5] &= ~One_SegFig; // yyxxll
+				else
+					gu8DsipNum[5] |= One_SegFig; //图标RPM显示//yyxxll
+			}
+			else // yxl-5  流量控制
+			{
+
+				data = gs8SetTmSpd_water[gu8SetTimeQuerySn];
+
+				/// 20211222
+
+				if (water_uint_switch == 0) // m3/h
+				{
+					data = gs8SetTmSpd_water[gu8SetTimeQuerySn];
+				}
+				else if (water_uint_switch == 1) // L/min
+				{
+					data = gs8SetTmSpd_water_lmin_lcd[gu8SetTimeQuerySn];
+				}
+
+				else if (water_uint_switch == 2) // IMP gpm
+				{
+					data = gs8SetTmSpd_water_imp_lcd[gu8SetTimeQuerySn];
+				}
+				else if (water_uint_switch == 3) // US gpm
+				{
+					data = gs8SetTmSpd_water_us_lcd[gu8SetTimeQuerySn];
+				}
+				/// 20211222
+				subDispRpm(data, 1);
+
+				if (gu8Wash)
+					gu8DsipNum[4] &= ~One_SegFig;
+				else
+					gu8DsipNum[4] |= One_SegFig;
+				gu8DsipNum[5] &= ~One_SegFig;
+			}
+		}
+		else if ((gu8SetMode EQU MODE)AND(gu8SetModeTm > 0))
+		{
+			for (k = 0; k < 17; k++) // YXL-5
+			{
+				if (gu8ModeSetSpd == (24 + k))
+					data = u16LadderSpd[k];
+			}
+
+			subDispRpm(data, 1);
+
+			///==================================================//yyxxll
+
+			if (fg_screen_real_watervalue == 1)
+			{
+				if (gu8SetTimeFlashCnt % 2) //闪烁显示
+				{
+					if (gu8Wash)
+						gu8DsipNum[4] &= ~One_SegFig;
+					else
+						gu8DsipNum[4] |= One_SegFig;
+					gu8DsipNum[5] &= ~One_SegFig;
+				}
+			}
+			else
+			{
+				if (gu8Wash)
+					gu8DsipNum[5] &= ~One_SegFig; // yyxxll
+				else
+					gu8DsipNum[5] |= One_SegFig; //图标RPM显示//yyxxll
+			}
+		}
+
+		//	else if ((gu8SpmTempGrade EQU 1)AND(gu8SetTimeFlashCnt % 2))
+		else if ((gu8SpmTempGrade EQU 1)) // yxl-5
+		{
+			if (gu8SetTimeFlashCnt % 2)
+			{
+				subDispTrip(); // yxl-5
+				subDispTripFlash();
+			}
+		}
+
+		else if (gu8SetMode EQU CONTROL) // YXL-5
+		{
+			//////////////////20211222
+			///////////////////////////////////////////////////////单位切换
+			data = WaterGate_set;
+			if (water_uint_switch == 0)
+			{
+				data = WaterGate_set;
+			}
+			else if (water_uint_switch == 1)
+			{
+				data = WaterGate_set_lmin_lcd;
+			}
+
+			else if (water_uint_switch == 2)
+			{
+				data = WaterGate_set_imp_lcd;
+			}
+			else if (water_uint_switch == 3)
+			{
+				data = WaterGate_set_us_lcd;
+			}
+			subDispRpm(data, 1);
+
+			if (gu8Wash)
+				gu8DsipNum[4] &= ~One_SegFig; // yyxxll
+			else
+				gu8DsipNum[4] |= One_SegFig; //
+
+			gu8DsipNum[5] &= ~One_SegFig; // yyxxll
+		}
+		//////////////////20211222
+		else
+		{
+			if ((gu8SetMode EQU TIME) && (gu8Wash == 0) AND(!ValBit(gu8SetTimeFlg, bInvalid)) AND(gu16RunSpd EQU 0))
+			{
+				if (fg_time_spd_contorl == 0) // yxl-5转速控制
+				{
+					for (k = 0; k < 17; k++) // yxl-5
+					{
+						if (gs8RunTmSpd[gu8TimeRunNum] == k)
+							data = u16LadderSpd[k];
+					}
+					if (data > 0)
+					{
+						subDispRpm(data, 1);
+						if (gu8Wash)
+							gu8DsipNum[5] &= ~One_SegFig; // yyxxll
+						else
+							gu8DsipNum[5] |= One_SegFig; //图标RPM显示//yyxxll
+					}
+				}
+				else // yxl-5  流量控制
+				{
+					data = gs8SetTmSpd_water[gu8TimeRunNum];
+
+					////////////////20211222
+					if (water_uint_switch == 0)
+					{
+						data = gs8SetTmSpd_water[gu8TimeRunNum];
+					}
+					else if (water_uint_switch == 1)
+					{
+						data = gs8SetTmSpd_water_lmin_lcd[gu8TimeRunNum];
+					}
+					else if (water_uint_switch == 2)
+					{
+						data = gs8SetTmSpd_water_imp_lcd[gu8TimeRunNum];
+					}
+					else if (water_uint_switch == 3)
+					{
+						data = gs8SetTmSpd_water_us_lcd[gu8TimeRunNum];
+					}
+					//////////////////20211222
+
+					subDispRpm(data, 1);
+
+					if (gu8Wash)
+						gu8DsipNum[4] &= ~One_SegFig;
+					else
+						gu8DsipNum[4] |= One_SegFig;
+
+					gu8DsipNum[5] &= ~One_SegFig;
+				}
+			}
+			else
+			{
+
+				if ((fg_time_spd_contorl == 0) || (fg_time_control == 0)) // yxl-5转速控制
+				{
+					if(fg_rest_con_ok == 1 )//修复定时运行不在时间段内运行之后自学习不会显示的问题
+					{
+						subDispRpm(data, 1);
+					}
+					data = gu16RunSpd;
+					if (data > 0)
+					{
+						// 20220210+修复N机从超频自吸返回转速时，会有一闪而过的2850
+						//						if (data > 2600)
+						//							data = u16LadderSpd[gu8ModeSetSpd - 24];
+						// 20220210+
+						subDispRpm(data, 1);
+
+						if (fg_screen_real_watervalue == 1)
+						{
+							if (gu8SetTimeFlashCnt % 2) //闪烁显示
+							{
+
+								if (gu8Wash)
+									gu8DsipNum[4] &= ~One_SegFig;
+								else
+									gu8DsipNum[4] |= One_SegFig;
+								gu8DsipNum[5] &= ~One_SegFig;
+							}
+						}
+						else
+						{
+							if (gu8Wash)
+								gu8DsipNum[5] &= ~One_SegFig; // yyxxll
+							else
+								gu8DsipNum[5] |= One_SegFig; //图标RPM显示//yyxxll
+						}
+					}
+				}
+				else // yxl-5  流量控制
+				{
+					data = gs8SetTmSpd_water[gu8TimeRunNum];
+
+					////////////////20211222
+					if (water_uint_switch == 0)
+					{
+						data = gs8SetTmSpd_water[gu8TimeRunNum];
+					}
+					else if (water_uint_switch == 1)
+					{
+						data = gs8SetTmSpd_water_lmin_lcd[gu8TimeRunNum];
+					}
+					else if (water_uint_switch == 2)
+					{
+						data = gs8SetTmSpd_water_imp_lcd[gu8TimeRunNum];
+					}
+					else if (water_uint_switch == 3)
+					{
+						data = gs8SetTmSpd_water_us_lcd[gu8TimeRunNum];
+					}
+					//////////////////20211222
+
+					subDispRpm(data, 1);
+
+					if (gu8Wash)
+						gu8DsipNum[4] &= ~One_SegFig;
+					else
+						gu8DsipNum[4] |= One_SegFig;
+					gu8DsipNum[5] &= ~One_SegFig;
+				}
+			}
+		}
+	}
+
+	//当前时间:四个七段数码管+图标: ----- 数码管8、9、10、11 + 二极管P1
+	if ((gu8SetMode EQU TIME) && (gu8Wash == 0) AND(gu16TripFlg EQU 0) AND(gu16TripFlg_tw EQU 0) AND(gu8SetTimeTm > 0) AND(gu8SpmTempGrade != 1)) // yxl-5
+	{
+		if (gu8SetTimeState < 3) //
+		{
+			if (gu8SetTimeState EQU 1)
+			{
+				if (gu8SetTimeFlashCnt % 2) //闪烁显示
+				{
+					subDispNowHour(gu16SetNowTm / 60, 1);
+				}
+			}
+			else
+			{
+				subDispNowHour(gu16SetNowTm / 60, 1);
+			}
+
+			if (gu8SetTimeState EQU 2)
+			{
+				if (gu8SetTimeFlashCnt % 2) //闪烁显示
+				{
+					subDispNowMin(gu16SetNowTm % 60, 1);
+				}
+			}
+			else
+			{
+				subDispNowMin(gu16SetNowTm % 60, 1);
+			}
+			gu8DsipNum[7] |= One_SegFig; // P1当前时间分割图标”:“显示
+		}
+	}
+
+	//设定定时时间:8个七段数码管+图标:+图标闹钟 ----- 数码管20、19、18、17、16、15、14、13
+	// + 二极管P4+ 二极管P3+ 二极管P2+ 二极管S6
+	if ((gu8SetMode EQU TIME) && (gu8Wash == 0) AND(gu16TripFlg EQU 0) AND(gu16TripFlg_tw EQU 0) AND(gu8SpmTempGrade != 1)) // yxl-5
+	{
+		if (gu8SetTimeTm > 0) //设置时显示
+		{
+			if (gu8SetTimeState > 2) //起始小时
+			{
+				if (gu8SetTimeTmSn EQU 0)
+				{
+					if (gu8SetTimeFlashCnt % 2) //闪烁显示
+					{
+
+						//============================================byxl-5   防止出现24;00 无法出现00；00的情况
+
+						if (SetStartTm[gu8SetTimeTmNum] == 1440)
+						{
+							subDispStartHour(0 / 60, 1);
+						}
+						else
+						{
+							subDispStartHour(SetStartTm[gu8SetTimeTmNum] / 60, 1);
+						}
+
+						//============================================byxl-5   防止出现24;00 无法出现00；00的情况
+					}
+				}
+				else
+				{
+					//============================================byxl-5   防止出现24;00 无法出现00；00的情况
+
+					if (SetStartTm[gu8SetTimeTmNum] == 1440)
+					{
+						subDispStartHour(0 / 60, 1);
+					}
+					else
+					{
+						subDispStartHour(SetStartTm[gu8SetTimeTmNum] / 60, 1);
+					}
+
+					//============================================byxl-5   防止出现24;00 无法出现00；00的情况
+				}
+				if (gu8SetTimeTmSn EQU 1)
+				{
+					if (gu8SetTimeFlashCnt % 2) //闪烁显示
+					{
+						subDispStartMin(SetStartTm[gu8SetTimeTmNum] % 60, 1);
+					}
+				}
+				else
+				{
+					subDispStartMin(SetStartTm[gu8SetTimeTmNum] % 60, 1);
+				}
+
+				if (gu8SetTimeTmSn EQU 2)
+				{
+					if (gu8SetTimeFlashCnt % 2) //闪烁显示
+					{
+						//============================================byxl-5   防止出现24;00 无法出现00；00的情况
+
+						if (SetEndTm[gu8SetTimeTmNum] == 1440)
+						{
+							subDispEndHour(0 / 60, 1);
+						}
+						else
+						{
+							subDispEndHour(SetEndTm[gu8SetTimeTmNum] / 60, 1);
+						}
+
+						//============================================byxl-5   防止出现24;00 无法出现00；00的情况
+					}
+				}
+				else
+				{
+					//============================================byxl-5   防止出现24;00 无法出现00；00的情况
+
+					if (SetEndTm[gu8SetTimeTmNum] == 1440)
+					{
+						subDispEndHour(0 / 60, 1);
+					}
+					else
+					{
+						subDispEndHour(SetEndTm[gu8SetTimeTmNum] / 60, 1);
+					}
+					//============================================yxl-5   防止出现24;00 无法出现00；00的情况
+				}
+
+				if (gu8SetTimeTmSn EQU 3)
+				{
+					if (gu8SetTimeFlashCnt % 2) //闪烁显示
+					{
+						subDispEndMin(SetEndTm[gu8SetTimeTmNum] % 60, 1);
+					}
+				}
+				else
+				{
+					subDispEndMin(SetEndTm[gu8SetTimeTmNum] % 60, 1);
+				}
+				gu8DsipNum[7] |= One_SegFig;
+				gu8DsipNum[10] |= One_SegFig; //
+				gu8DsipNum[13] |= One_SegFig; //
+			}
+		}
+		else if (gu8SetTimeQueryTm > 0)
+		{
+			j = gu8SetTimeQuerySn;
+			subDispStartHour(gs16RunStartTm[j] / 60, 1);
+			subDispStartMin(gs16RunStartTm[j] % 60, 1);
+			subDispEndHour(gs16RunEndTm[j] / 60, 1);
+			subDispEndMin(gs16RunEndTm[j] % 60, 1);
+
+			gu8DsipNum[7] |= One_SegFig;
+			gu8DsipNum[10] |= One_SegFig; //
+			gu8DsipNum[13] |= One_SegFig; //
+		}
+		else if (ValBit(gu8SetTimeFlg, bInvalid)) //无有效定时，显示 “--:--"
+		{
+			gu8DsipNum[7] = u8LcdDispTab1[22];
+			gu8DsipNum[8] = u8LcdDispTab1[22];
+
+			gu8DsipNum[9] = u8LcdDispTab1[22];
+			gu8DsipNum[10] = u8LcdDispTab1[22];
+
+			gu8DsipNum[11] = u8LcdDispTab1[22];
+			gu8DsipNum[12] = u8LcdDispTab1[22];
+
+			gu8DsipNum[13] = u8LcdDispTab1[22];
+			gu8DsipNum[14] = u8LcdDispTab1[22];
+
+			gu8DsipNum[7] |= One_SegFig;
+			gu8DsipNum[10] |= One_SegFig; //
+			gu8DsipNum[13] |= One_SegFig; //
+		}
+		else // if ((gu8TimeRunNum < 4) AND (bCompOnCmd))
+		{
+			j = gu8TimeRunNum;
+
+			subDispStartHour(gs16RunStartTm[j] / 60, 1);
+			subDispStartMin(gs16RunStartTm[j] % 60, 1);
+			subDispEndHour(gs16RunEndTm[j] / 60, 1);
+			subDispEndMin(gs16RunEndTm[j] % 60, 1);
+
+			gu8DsipNum[7] |= One_SegFig;
+			gu8DsipNum[10] |= One_SegFig; //
+			gu8DsipNum[13] |= One_SegFig; //
+		}
+	}
+
+	//定时设定个数:1个七段数码管 +图标闹钟 ----- 数码管12 + 二极管S7
+	if ((gu8SetMode EQU TIME) && (gu8Wash == 0) AND(gu16TripFlg EQU 0) AND(gu16TripFlg_tw EQU 0) AND(gu8SpmTempGrade != 1))
+	{
+		if (gu8SetTimeQueryTm > 0) //查询闪烁显示
+		{
+			if (gu8SetTimeFlashCnt % 2) //闪烁显示
+			{
+				//				gu8DsipNum[22] = u8LcdDispTab3[gu8SetTimeQuerySn+1];
+				if (gu8SetTimeQuerySn EQU 0)
+					gu8DsipNum[8] |= One_SegFig;
+				else if (gu8SetTimeQuerySn EQU 1)
+					gu8DsipNum[9] |= One_SegFig;
+				else if (gu8SetTimeQuerySn EQU 2)
+					gu8DsipNum[11] |= One_SegFig;
+				else if (gu8SetTimeQuerySn EQU 3)
+					gu8DsipNum[12] |= One_SegFig;
+			}
+			//		gu8DsipNum[3] |= Thr_SegFig; //S7设定定时图标闹钟显示
+		}
+		else if (gu8SetTimeTm > 0) //定时设置显示
+		{
+			//			if (gu8SetTimeState > 2)		i = gu8SetTimeTmNum+1;
+			//			else i = 0;
+			//
+			//			gu8DsipNum[22] = u8LcdDispTab3[i];
+			//			gu8DsipNum[3] |= Thr_SegFig; //S7设定定时图标闹钟显示
+			if (gu8SetTimeState > 2)
+			{
+				if (gu8SetTimeTmNum EQU 0)
+					gu8DsipNum[8] |= One_SegFig;
+				else if (gu8SetTimeTmNum EQU 1)
+					gu8DsipNum[9] |= One_SegFig;
+				else if (gu8SetTimeTmNum EQU 2)
+					gu8DsipNum[11] |= One_SegFig;
+				else if (gu8SetTimeTmNum EQU 3)
+					gu8DsipNum[12] |= One_SegFig;
+			}
+		}
+		else if (!ValBit(gu8SetTimeFlg, bInvalid)) //定时运行时
+		{
+			//			if (gu8TimeRunNum < 4)	i = gu8TimeRunNum+1;
+			//			else	i = 0;
+			//			gu8DsipNum[22] = u8LcdDispTab3[i];
+			//			gu8DsipNum[3] |= Thr_SegFig; //S7设定定时图标闹钟显示
+			if ((gu16RunSpd)OR(gu8SetTimeFlashCnt % 2))
+			{
+				if (gu8TimeRunNum EQU 0)
+					gu8DsipNum[8] |= One_SegFig;
+				else if (gu8TimeRunNum EQU 1)
+					gu8DsipNum[9] |= One_SegFig;
+				else if (gu8TimeRunNum EQU 2)
+					gu8DsipNum[11] |= One_SegFig;
+				else if (gu8TimeRunNum EQU 3)
+					gu8DsipNum[12] |= One_SegFig;
+			}
+		}
+		else if (gu8SetTimeFlashCnt % 2)
+		{
+			gu8DsipNum[8] |= One_SegFig;
+			gu8DsipNum[9] |= One_SegFig;
+			gu8DsipNum[11] |= One_SegFig;
+			gu8DsipNum[12] |= One_SegFig;
+		}
+	}
+}
+//解锁时按键灯全亮，锁定时只有解锁键亮
+void subKeyLed(void)
+{
+	// if ((gu8SetMode != 0) OR(gu8LockKeyTm > 0))
+	if (gu8LockKeyTm > 0) // yxl-deng
+	{
+		gu8DsipNum[15] |= (One_Seg_A | One_Seg_B | One_Seg_C | One_Seg_D | One_Seg_E | One_Seg_F);
+		fg_one_led = 0;
+	}
+	else
+	{
+		gu8DsipNum[15] |= (One_Seg_E);
+		if(fg_ageing_ok == 0)//20220601+预防老化时不会暗亮交替变化
+			fg_one_led = 1;
+	}
+}
+
+void FunDispBuff(void)
+{
+	if (gu8SetMode EQU FASTTEST)
+	{
+		subDispTest();
+	}
+	else
+	{
+		subDispBuff();
+		subKeyLed();
+	}
+}

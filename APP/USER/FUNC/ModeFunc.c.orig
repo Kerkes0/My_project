@@ -1,0 +1,104 @@
+#include "ModeFunc.h"
+
+
+void FunModeShutDown(void)
+{
+		if (ValBit(gu16KeyFlg, bPower))
+		{ //开机
+			// gu16UartSpd = 0; //yyxxll4  面板优先级大于485控制
+			if (gu8SetMode_eep == MODE) // yxl-5  关机带记忆
+			{
+				gu8SetMode = MODE;
+			}
+			else if (gu8SetMode_eep == TIME)
+			{
+				gu8SetMode = TIME;
+			}
+			else
+			{
+				gu8SetMode = CONTROL;
+			}
+
+			gu8SetMode_eep = 0; // yxl  恢复默认流量模式
+
+			fg_hand_close = 0; //手动关机标志，不能485开机
+
+			fg_control_conmon = 0; //取消外部控制
+
+			if ((switch_key & 0x01) && (gu8SetMode != FASTTEST)) // yxl-5  两种外部控制方式
+			{
+				ClrBit(gu8InCtrlFlg, bStop);
+			}
+		}
+		else if (ValBit(gu16KeyFlg, bLongTimeUp))
+		{ //初始化设置
+			// gu16UartSpd = 0;//yyxxll4  面板优先级大于485控制
+			sub1stRam(); //恢复出厂设置
+			gu8SoftWareVerTm = 0;
+			ClrBit(gu8SetFlg, bSetRom);
+			gu8SetRomTm = 0;
+
+			gu8LcdInitOk = 1;
+			// gu8LcdInitTm = 6;
+			gu8LcdInitTm = 15; //液晶7.5s初始化
+			gu8RTCWaitTm = 0;
+			SetBit(gu8SetTimeFlg, bNowTime);
+		}
+		else if (ValBit(gu16KeyFlg, bLongTimeDown))
+		{ //软件版本号
+			// gu16UartSpd = 0;//yyxxll4  面板优先级大于485控制
+			gu8SoftWareVerTm = 12; //版本号显示时间12*500ms=6s
+			ClrBit(gu8SetFlg, bSetRom);
+			gu8SetRomTm = 0;
+		}
+		else if (ValBit(gu16KeyFlg, bLongUpDown))
+		{ // gu16UartSpd = 0;//yyxxll4  面板优先级大于485控制
+			gu8SetRomTm = 30;
+			if (!ValBit(gu8SetFlg, bSetRom))
+			{
+				SetBit(gu8SetFlg, bSetRom);
+				gu8SetRomSn = 0;
+				gu8SoftWareVerTm = 0;
+			}
+			else
+			{
+				/// if (++gu8SetRomSn > 5)//yyxxll
+				if (++gu8SetRomSn > 5) // yyxxll  yxl-5
+				{
+					ClrBit(gu8SetFlg, bSetRom);
+					gu8SetRomTm = 0;
+				}
+			}
+		}
+		//长按MODE、CONTROL、TIME键进行气压校准（在key.c文件获取fg_dis_air标志）
+		else if (fg_dis_air == 1) // yxl-5
+		{
+			if (gu8LcdInitTm == 0) // LCD液晶屏初始化完后（检测屏幕和机型码完后）
+			{
+				fg_dis_air = 0; //手动清标志
+
+				count_dis_air_tm = 15; //显示500ms*15=7.5s时间的气压校准标志
+
+				temp_cail_add = 0;	  //校准数据归零
+				temp_cail_subtra = 0; //校准数据归零
+				fg_air_cali = 3;	  //大气校准中重新获得校准数据
+				fg_waterpro_ok = 1;	  //开启传感器故障        //只有出厂才保证是有效
+			}
+		}
+		//长按CONTROL、TIME键取消开启无水保护（在key.c文件获取fg_dis_waterpro标志）
+		else if (fg_dis_waterpro == 1)
+		{
+			fg_dis_waterpro = 0; //手动清标志
+			//开就关、关就开
+			if (fg_waterpro_ok)
+			{
+				fg_waterpro_ok = 0; //关闭传感器
+			}
+			else
+			{
+				fg_waterpro_ok = 1; //打开传感器
+			}
+			fg_rest_con_ok = 1;		//进入自学习
+			count_waterpro_tm = 15; //显示500ms*15=7.5s时间的无水保护是否开启
+		}	
+}

@@ -1,0 +1,42 @@
+
+T0DD0 000:237 SEGGER J-Link V6.10i Log File (0001ms, 0068ms total)
+T0DD0 000:237 DLL Compiled: Oct 25 2016 19:31:51 (0001ms, 0068ms total)
+T0DD0 000:237 Logging started @ 2019-05-06 09:06 (0001ms, 0068ms total)
+T0DD0 000:238 JLINK_SetWarnOutHandler(...) (0000ms, 0068ms total)
+T0DD0 000:238 JLINK_OpenEx(...)
+Firmware: J-Link V9 compiled Apr 20 2018 16:47:26
+Hardware: V9.40
+S/N: 59410795
+Feature(s): RDI, GDB, FlashDL, FlashBP, JFlashWEBSRV Webserver running on local port 19080 (0036ms, 0104ms total)
+T0DD0 000:238   returns O.K. (0036ms, 0104ms total)
+T0DD0 000:274 JLINK_SetErrorOutHandler(...) (0000ms, 0104ms total)
+T0DD0 000:274 JLINK_ExecCommand("ProjectFile = "C:\Users\Administrator\Desktop\AQW1801\JLinkSettings.ini"", ...).   returns 0x00 (0089ms, 0193ms total)
+T0DD0 000:363 JLINK_ExecCommand("Device = STM32F030R8", ...). Device "STM32F030R8" selected.  returns 0x00 (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_ExecCommand("DisableConnectionTimeout", ...).   returns 0x01 (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_GetHardwareVersion()  returns 0x16F30 (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_GetDLLVersion()  returns 61009 (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_GetFirmwareString(...) (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_GetDLLVersion()  returns 61009 (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_GetCompileDateTime() (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_GetFirmwareString(...) (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_GetHardwareVersion()  returns 0x16F30 (0000ms, 0193ms total)
+T0DD0 000:363 JLINK_TIF_Select(JLINKARM_TIF_SWD)  returns 0x00 (0008ms, 0201ms total)
+T0DD0 000:371 JLINK_SetSpeed(20000) (0002ms, 0203ms total)
+T0DD0 000:373 JLINK_SetResetType(JLINKARM_RESET_TYPE_NORMAL)  returns JLINKARM_RESET_TYPE_NORMAL (0000ms, 0203ms total)
+T0DD0 000:373 JLINK_Reset() >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF> >0x108 TIF>STM32 (connect): Can not attach to CPU. Trying connect under reset. >0x108 TIF> >0x108 TIF>
+  ***** Error: STM32: Connecting to CPU via connect under reset failed. >0x108 TIF> >0x108 TIF>
+STM32 (connect): Can not attach to CPU. Trying connect under reset. >0x108 TIF> >0x108 TIF>
+  ***** Error: STM32: Connecting to CPU via connect under reset failed.JLINK_GetId() >0x108 TIF> >0x108 TIF>STM32 (connect): Can not attach to CPU. Trying connect under reset. >0x108 TIF> >0x108 TIF>
+  ***** Error: STM32: Connecting to CPU via connect under reset failed. >0x108 TIF> >0x108 TIF>STM32 (connect): Can not attach to CPU. Trying connect under reset. >0x108 TIF> >0x108 TIF>
+  ***** Error: 
+STM32: Connecting to CPU via connect under reset failed.  returns 0x00000000 (0741ms, 2712ms total)
+T0DD0 002:885 JLINK_GetId() >0x108 TIF> >0x108 TIF>STM32 (connect): Can not attach to CPU. Trying connect under reset. >0x108 TIF> >0x108 TIF>
+  ***** Error: STM32: Connecting to CPU via connect under reset failed. >0x108 TIF> >0x108 TIF>STM32 (connect): Can not attach to CPU. Trying connect under reset. >0x108 TIF> >0x108 TIF>
+  ***** Error: STM32: Connecting to CPU via connect under reset failed.  returns 0x00000000 (0742ms, 3454ms total)
+T0DD0 003:629 JLINK_GetFirmwareString(...) (0000ms, 3454ms total)
+T0DD0 005:391 JLINK_SWO_Control(JLINKARM_SWO_CMD_GET_SPEED_INFO, ...)  returns 0x00 (0002ms, 3456ms total)
+T0DD0 005:393 JLINK_SWO_Control(JLINKARM_SWO_CMD_GET_SPEED_INFO, ...)  returns 0x00 (0002ms, 3458ms total)
+T0DD0 005:396 JLINK_SWO_Control(JLINKARM_SWO_CMD_GET_SPEED_INFO, ...)  returns 0x00 (0002ms, 3460ms total)
+T0DD0 016:696 JLINK_Close() (0010ms, 3470ms total)
+T0DD0 016:696  (0010ms, 3470ms total)
+T0DD0 016:696 Closed (0010ms, 3470ms total)

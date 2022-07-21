@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"siic.h": "c",
+			"display.h": "c",
+			"tm1729.h": "c",
+			"buzzer.h": "c",
+			"sysclock.h": "c",
+			"key.h": "c",
+			"led.h": "c",
+			"ic74hc595.h": "c",
+			"syscore.h": "c",
+			"mgh333.C": "cpp",
+			"user.h": "c",
+			"f2mc_8fx_eeprom.h": "c",
+			"stm32f0xx.h": "c",
+			"sys_init.h": "c",
+			"mode.h": "c",
+			"modefunc.h": "c",
+			"adc.h": "c",
+			"lcd.h": "c",
+			"lcdfunc.h": "c"
+		}
+	}
+}
